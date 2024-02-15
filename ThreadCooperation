@@ -1,0 +1,139 @@
+/*
+This java Program demonstrates the differences of priorities and how important it is to set the priorities for Thread Cooperations.
+We are setting the Thread Priority in the main function and call each class for the desired output
+ */
+
+
+import java.io.*;
+import java.util.*;
+import java.io.PrintWriter;
+
+//Assignment: CSC406 Thread Cooperation
+//Name: Lukas Siemers
+
+public class ThreadCooperation extends Thread {
+
+    private static PrintWriter outputFile;
+
+    public static void main(String[] args) throws FileNotFoundException {
+
+       outputFile = new PrintWriter(new File("Thread.txt"));
+
+
+        GUI gui = new GUI();                                //Creating a GUI Object
+        WordProcessor wordProcessor = new WordProcessor();  //Creating a word Processor Object
+        DataStorage dataStorage = new DataStorage();        //Creating a Data Storage Object
+        Printer printer = new Printer();                    //Creating a Printer Object
+
+        Thread guiThread = new Thread(gui);             //Creating a new Thread
+        Thread wpThread = new Thread(wordProcessor);    //Creating a new Thread
+        Thread dsThread = new Thread(dataStorage);      //Creating a new Thread
+        Thread printerThread = new Thread(printer);     //Creating a new Thread
+
+        guiThread.setPriority(Thread.MIN_PRIORITY);     //Setting Priority
+        wpThread.setPriority(Thread.NORM_PRIORITY);     //Setting Priority
+        dsThread.setPriority(Thread.MIN_PRIORITY);      //Setting Priority
+        printerThread.setPriority(Thread.MIN_PRIORITY); //Setting Priority
+
+        guiThread.start();      //Starting the Thread
+        wpThread.start();       //Starting the Thread
+        dsThread.start();       //Starting the Thread
+        printerThread.start();  //Starting the Thread
+
+        try {
+            guiThread.join();       //Waiting for the Thread to complete its execution
+            wpThread.join();        //Waiting for the Thread to complete its execution
+            dsThread.join();        //Waiting for the Thread to complete its execution
+            printerThread.join();   //Waiting for the Thread to complete its execution
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println("complete");
+        outputFile.close();
+    }
+/*
+The GUI class is one of the most important classes in this program due to the reason that the GUI will have to stay up the longest
+I implemented a startTime system that allows me to track the span of 5 minutes execution time for this class.
+With the Priority already set we just need to print the desired Output for the duration of the class
+ */
+
+    static class GUI implements Runnable {
+        @Override
+        public void run() {
+            long startTime = System.currentTimeMillis();    //The Start time to track the 5 minutes run time
+            int duration = 5 * 60 * 1000;          //Duration for Time that the GUI will run ( 5 minutes)
+
+            while (System.currentTimeMillis() - startTime < duration) { //Loop while the time is less than 5 minutes
+                System.out.println("GUI Poll");
+                outputFile.println("GUI Poll");
+
+                try {                       // I used the Thread.Sleep in order to have the output look better
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    }
+    /*
+    The word Processor class allows us to "Process Words" by taking in Characters and displaying them every 10th iteration.
+
+     */
+    static class WordProcessor implements Runnable {
+        @Override
+        public void run() {
+            int totalCharacters = 50 * 10 * 2; //Total Character count for the loop
+            for (int i = 0; i < totalCharacters; i++) { //Looping while i is less than
+                if ((i + 1) % 10 == 0) {    // if statement to only print out every tenth line
+                    System.out.print("WP" + (i+1) +"\n");
+                    outputFile.println("WP" + (i+1));
+
+                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    }
+    /*
+    The data storage simulates the operation of storage by printing every 20th line.
+     */
+    static class DataStorage implements Runnable {
+        @Override
+        public void run() {
+            for (int cycle = 0; cycle < 2500 ; cycle++) {       //looping till cycle has reached 2500
+                if (cycle > 0) {                                //Just so we don't print out the 0th one
+                    if ((cycle + 1) % 20 == 0) {                //If Statement to print out every 20th cycle
+                        System.out.print("DS" + (cycle+1) +"\n");
+                        outputFile.println("DS" + (cycle+1) );
+                    }
+                }
+            }
+        }
+    }
+    /*
+    Lastly, The Printer class allows us to Simulate a Printer by printing lines with character ranges(60) every 6 iterations
+     */
+    static class Printer implements Runnable {
+        @Override
+        public void run() {
+
+            int totalLines = 6;     //Variable for the loop
+            int charactersPerLine = 60; //The amount of characters per Line
+
+            for (int i = 0; i < totalLines; i++) {  //looping
+                int startCharacter = i * charactersPerLine + 1; //Start Characters would be the i * current character per line + 1
+                int endCharacter = (i + 1) * charactersPerLine; //End Character would be i + 1 * Character per Line
+                System.out.println("Print Line " + (i + 1) + " characters " + startCharacter + " thru " + endCharacter);
+                outputFile.println("Print Line " + (i + 1) + " characters " + startCharacter + " thru " + endCharacter);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    }
+}
