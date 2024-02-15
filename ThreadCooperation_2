@@ -1,0 +1,154 @@
+class Router {
+    //PRINT RATE FOR EACH BRANCH
+    private double printRatePB = 0.007;
+    private double printRateFB = 0.009;
+    private double printRateMB = 0.0095;
+
+
+    //DATA RATE FOR EACH BRANCH
+    private double dataRatePB = 0.008;
+    private double dataRateFB = 0.007;
+    private double dataRateMB = 0.0082;
+
+
+    //SUM OF ALL PRINT COST FOR EACH BRANCH
+    private double totalPrintCostPB = 0;
+    private double totalPrintCostFB = 0;
+    private double totalPrintCostMB = 0;
+
+
+    //SUM OF ALL DATA COST FOR EACH BRANCH
+    private double totalDataCostPB = 0;
+    private double totalDataCostFB = 0;
+    private double totalDataCostMB = 0;
+
+/*
+This method allows us to Process the job depending on their cahracter selection, as an example the first job
+                new Job(router, "PB", 1, 'D', 60000),   //Stands for Data service in the Production Branch on Computer Port 1 with 60000 characters
+Based on that information we will direct the current job and associated variables to their Branch function where we will calculate the cost based on the Rate which we have initialized in the top
+ */
+    public synchronized void processJob(String branch, int computerPort, char jobType, int numChars) {
+        if (jobType == 'D') {              //JobType 'D' = Data
+            if (branch == "PB") {
+                updateDataCostProduction(branch,numChars);  //Production branch
+            }
+            else if (branch == "FB"){
+                updateDataCostFinancial(branch,numChars);   //Financial Branch
+            }
+            else if (branch == "MB"){
+                updateDataCostMarketing(branch,numChars);   //Marketing Branch
+            }
+        } else if (jobType == 'P') {       //JobType 'P' = Print
+            if (branch == "PB") {
+                updatePrintCostProduction(branch,numChars); //Production Branch
+            }
+            else if (branch == "FB"){
+                updatePrintCostFinancial(branch,numChars);  //Financial Branch
+            }
+            else if (branch == "MB"){
+                updatePrintCostMarketing(branch,numChars);  //Marketing Branch
+            }
+        }
+    }
+/*
+    The Methods below allow us to update the total cost of each branch for the Print or Data by multiplying the rate and number of characters
+ */
+    private void updatePrintCostProduction (String branch, int numChars){
+        totalPrintCostPB += printRatePB * numChars; //Update the total print cost for Production Branch
+        System.out.println("Added " + printRatePB * numChars + " to " + branch + " Print");   //Display of how many characters were added to the Branch selected
+
+    }
+    private void updatePrintCostFinancial (String branch, int numChars){
+        totalPrintCostFB += printRateFB * numChars; //Update the total print cost for Production Branch
+        System.out.println("Added " + printRateFB * numChars + " to " + branch + " Print");   //Display of how many characters were added to the Branch selected
+
+    }
+    private void updatePrintCostMarketing (String branch, int numChars){
+        totalPrintCostMB += printRateMB * numChars; //Update the total print cost for Production Branch
+        System.out.println("Added " + printRateMB * numChars + " to " + branch + " Print");   //Display of how many characters were added to the Branch selected
+
+    }
+    private void updateDataCostProduction(String branch, int numChars) {
+        totalDataCostPB += dataRatePB * numChars;
+        System.out.println("Added " + dataRatePB * numChars + " to " + branch + " Print");   //Display of how many characters were added to the Branch selected
+
+    }
+    private void updateDataCostFinancial(String branch, int numChars) {
+        totalDataCostFB += dataRateFB * numChars;
+        System.out.println("Added " + dataRateFB * numChars + " to " + branch + " Print");   //Display of how many characters were added to the Branch selected
+
+    }
+    private void updateDataCostMarketing(String branch, int numChars) {
+        totalDataCostMB += dataRateMB * numChars;
+        System.out.println("Added " + dataRateMB * numChars + " to " + branch + " Print");   //Display of how many characters were added to the Branch selected
+
+    }
+
+    public synchronized void printBranchCosts() {
+        System.out.println(" ");
+        System.out.println("Production Branch Costs:");
+        printCosts("PB", totalPrintCostPB, totalDataCostPB);
+        System.out.println(" ");
+        System.out.println("Financial Branch Costs:");
+        printCosts("FB", totalPrintCostFB, totalDataCostFB);
+        System.out.println(" ");
+        System.out.println("Marketing Branch Costs:");
+        printCosts("MB", totalPrintCostMB, totalDataCostMB);
+    }
+    private void printCosts(String branch, double printCost, double dataCost) {
+        double totalCost = printCost + dataCost;
+        System.out.println("Print: " + printCost + "   Data: " + dataCost + "    Total: " + totalCost);
+    }
+}
+class Job implements Runnable { // Represents a job to be executed by a thread
+    private Router router;
+    private String branch;
+    private int computerPort;
+    private char jobType;
+    private int numChars;
+/*
+The Constructer for the Job Class
+ */
+    public Job(Router router, String branch, int computerPort, char jobType, int numChars) {
+        this.router = router;           //Router
+        this.branch = branch;           //Branch
+        this.computerPort = computerPort;   //Computer port
+        this.jobType = jobType;         //Job Type
+        this.numChars = numChars;       //Number of characters
+    }
+
+    @Override
+    public void run() {
+        router.processJob(branch, computerPort, jobType, numChars);
+    }
+}
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Router router = new Router();
+        Thread[] threads = new Thread[9];
+
+        Job[] jobs = {
+                new Job(router, "PB", 1, 'D', 60000),   //Initializing the Job
+                new Job(router, "PB", 3, 'P', 100000),  //Initializing the Job
+                new Job(router, "PB", 2, 'D', 75000),   //Initializing the Job
+                new Job(router, "FB", 1, 'P', 30000),   //Initializing the Job
+                new Job(router, "FB", 2, 'D', 150000),  //Initializing the Job
+                new Job(router, "FB", 3, 'P', 89000),   //Initializing the Job
+                new Job(router, "MB", 1, 'P', 200000),  //Initializing the Job
+                new Job(router, "MB", 2, 'D', 140000),  //Initializing the Job
+                new Job(router, "MB", 3, 'P', 135000)  //Initializing the Job
+        };
+
+        for (int i = 0; i < threads.length; i++) {        // Create threads for each job and start them
+            final int index = i;
+            threads[i] = new Thread(() -> jobs[index].run());
+            threads[i].start();
+        }
+        for (int i = 0; i < threads.length; i++) {
+            Thread thread = threads[i]; //Get the current Thread from the array threads at position [i]
+            thread.join();
+        }
+        // Print branch costs summary
+        router.printBranchCosts();
+    }
+}
