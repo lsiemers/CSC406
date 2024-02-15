@@ -1,0 +1,263 @@
+import java.util.concurrent.locks.*;
+import java.util.Arrays;
+
+class Router {
+    int[] Dstore = new int[30]; // Array to store data
+    String[] Cstore = new String[30]; // Array to store computer names
+    int count = 0; // Counter to track the number of elements stored
+    ReentrantLock lock = new ReentrantLock(); // Lock for synchronization
+    Condition storageAvailable = lock.newCondition(); // Condition for storage availability
+    Condition deletionAvailable = lock.newCondition(); // Condition for deletion availability
+
+    // Method to store data
+    public void store(String computer, int amount, int data) throws InterruptedException {
+        lock.lock();
+        try {
+            // Wait until there is enough space available
+            while (count + amount > Dstore.length) {
+                storageAvailable.await();
+            }
+            int startIndex = count;
+            // If data already exists for another computer, find the start index for new data
+            if (count != 0 && !Cstore[count - 1].equals(computer)) {
+                for (int i = count - 1; i >= 0; i--) {
+                    if (!Cstore[i].equals(computer)) {
+                        startIndex = i + 1;
+                        break;
+                    }
+                }
+            }
+            // Store data for the specified computer
+            for (int i = 0; i < amount; i++) {
+                if (startIndex + i < Dstore.length) {
+                    Dstore[startIndex + i] = data;
+                    Cstore[startIndex + i] = computer;
+                } else {
+                    // Wrap around if the index exceeds array size
+                    Dstore[i] = data;
+                    Cstore[i] = computer;
+                }
+            }
+            count = Math.min(count + amount, Dstore.length); // Update count
+            System.out.println(computer + " - Stored " + amount + " integers for computer " + computer);
+            System.out.println("");
+            printBuffer(); // Print buffer arrays
+            storageAvailable.signal(); // Signal availability for storage
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // Method to delete data
+    public void delete(String computer, int amount) throws InterruptedException {
+        lock.lock();
+        try {
+            // Wait until there is data available for deletion
+            while (!hasDataToDelete(computer, amount)) {
+                deletionAvailable.await();
+            }
+            int deleted = 0;
+            // Delete data for the specified computer
+            for (int i = 0; i < count && deleted < amount; i++) {
+                if (Cstore[i] != null && Cstore[i].equals(computer)) {
+                    Dstore[i] = 0;
+                    Cstore[i] = null;
+                    deleted++;
+                }
+            }
+            compactArray(); // Compact the array after deletion
+            System.out.println(computer + " - Deleted " + deleted + " integers for computer " + computer);
+            System.out.println("");
+            printBuffer(); // Print buffer arrays
+            deletionAvailable.signal(); // Signal availability for deletion
+            storageAvailable.signal(); // Signal availability for storage after deletion
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // Method to check if data is available for deletion
+    private boolean hasDataToDelete(String computer, int amount) {
+        int deletionCount = 0;
+        for (int i = 0; i < count; i++) {
+            if (Cstore[i] != null && Cstore[i].equals(computer)) {
+                deletionCount++;
+            }
+        }
+        return deletionCount >= amount;
+    }
+
+    // Method to compact the array after deletion
+    private void compactArray() {
+        int shiftIndex = 0;
+        for (int i = 0; i < count; i++) {
+            if (Dstore[i] != 0 && Cstore[i] != null) {
+                Dstore[shiftIndex] = Dstore[i];
+                Cstore[shiftIndex] = Cstore[i];
+                shiftIndex++;
+            }
+        }
+        for (int i = shiftIndex; i < count; i++) {
+            Dstore[i] = 0;
+            Cstore[i] = null;
+        }
+        count = shiftIndex;
+    }
+
+    // Method to print buffer arrays
+    public void printBuffer() {
+        System.out.println("Dstore: " + Arrays.toString(Arrays.copyOf(Dstore, count)));
+        System.out.println("Cstore: " + Arrays.toString(Arrays.copyOf(Cstore, count)));
+        System.out.println("");
+        System.out.println("____________________________________________________________________________");
+    }
+}
+
+// Thread class for storing data
+class StorageThread extends Thread {
+    private Router router;
+    private String branch;
+    private String computer;
+    private int amount;
+    private int data;
+
+    public StorageThread(Router router, String branch, String computer, int amount, int data) {
+        this.router = router;
+        this.branch = branch;
+        this.computer = computer;
+        this.amount = amount;
+        this.data = data;
+    }
+
+    public void run() {
+        try {
+            router.store(computer, amount, data);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+// Thread class for deleting data
+class DeleteThread extends Thread {
+    private Router router;
+    private String branch;
+    private String computer;
+    private int amount;
+
+    public DeleteThread(Router router, String branch, String computer, int amount) {
+        this.router = router;
+        this.branch = branch;
+        this.computer = computer;
+        this.amount = amount;
+    }
+
+    public void run() {
+        try {
+            router.delete(computer, amount);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Router router = new Router();
+
+        // Storage thread data
+        String[] storageBranch = {"PB1", "FB2", "PB1", "MB3", "FB4"};
+        String[] storageComputer = {"PB1", "FB2", "PB1", "MB3", "FB4"};
+        int[] storageAmount = {5, 6, 7, 10, 6};
+        int[] storageData = {-3, 78, 13, 22, 75};
+
+        // Delete thread data
+        String[] deleteBranch = {"FB2", "PB1", "MB3", "PB1"};
+        String[] deleteComputer = {"FB2", "PB1", "MB3", "PB1"};
+        int[] deleteAmount = {2, 2, 4, 3};
+
+        // Create and start storage threads
+        for (int i = 0; i < storageBranch.length; i++) {
+            StorageThread storageThread = new StorageThread(router, storageBranch[i], storageComputer[i], storageAmount[i], storageData[i]);
+            storageThread.start();
+        }
+
+        // Create and start delete threads
+        for (int i = 0; i < deleteBranch.length; i++) {
+            DeleteThread deleteThread = new DeleteThread(router, deleteBranch[i], deleteComputer[i], deleteAmount[i]);
+            deleteThread.start();
+        }
+    }
+}
+
+
+
+While the Network Manager has asked you to provide the costs for the system data flow as described in
+Problem 2, the Systems Engineer now comes with this problem. The Router is hooked to a memory
+bank of fixed size. The memory bank has been allocated/partitioned so that each of the three Branches
+must share a fixed amount of 30 integer storage positions. The actual storage is tagged by a parallel
+array of characters. Consequently any computer storing data from any branch can also delete that same
+data.
+
+The storage data structure is two parallel arrays with the follo0wing data type and info.
+int Dstore[30] this stores the integer data from a particular computer from a particular branch.
+string Cstore[30] this stores a three character string identifying the computer storing the data
+
+(i.e.PB1, PB2, FB1, …….., MB3)
+
+The SE wants you to write the multi threaded interface to the router servicing the memory bank. All
+data that runs through the Router must first flow through the Interface Software. This software must
+have the following characteristics for both Storage and Delete.
+Storage:
+1. Data stored must have the computer storing the data keyed. That is both the Dstore[] and
+the Cstore[] arrays must be updated to reflect the stored integer and the owner of the data.
+2. Data cannot be stored if there is no room for it. It must wait till there is room.
+3. Data stored for an owner already having data in the array must be placed with that data
+already in the array.
+4. New Data for a new owner is always stored at the “bottom” of the array (in the lower to
+higher subscripts where there are empty elements).
+
+Delete:
+1. At least one element of data must be available for deletion. Otherwise the delete function
+must wait.
+2. When deleting, both the owner name from Cstore[i] and the corresponding integer data
+from Dstore[i] must be deleted from their corresponding arrays.
+3. If an owner deletion request is a greater number of elements than the owned data, all of the
+owner’s data is deleted.
+4. Storage arrays for a particular owner must be made dense after deletion (that is there can
+be no empty holes in the owner’s section of the array).
+
+Write the code to manage the storage buffer under a multithreaded environment. Write a simulation
+to test your code.
+Your simulation should do the following;
+1. Create two threads, one for storage and one for deletion. Have these threads simulate the
+storage and deletion requests coming in from each computer from each branch.
+2. Have each thread use the following interface with the storage buffer object.
+a. Buf.store(String, int, int) where store(String three character string identifying the
+storage computer, int number of integers to store, int integer to be stored).
+b. Buf.Delete(String, int) where Delete(string three character string identifiyin the
+storage computer, int number of integers to delete)
+
+Test data for this problem
+Storage thread Data
+Branch Computer Amount Integer to be stored
+PB1 5 -3
+FB2 6 78
+PB1 7 13
+MB3 10 22
+FB4 6 75
+
+Delete Thread Data
+Branch Computer Amount
+FB2 2
+PB1 2
+MB3 4
+PB1 3
+
+As output for your program, print the buffer arrays Dstore[30] and Cstore[30] after each addition and
+deletion.
+
+
+
+
+
