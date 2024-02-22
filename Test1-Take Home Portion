@@ -1,0 +1,81 @@
+//Name: Lukas Siemers
+//Project: CSC 406 Take Home Portion
+
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+
+public class Main {
+
+    public static void main(String[] args) {
+        ForSale dutchMastersOilPainting = new ForSale("Dutch Masters Oil Painting", 5000.00, 600000.00, 4827, 17050, 18490); // Object that is listen on Ebay
+        int[][] bids = {    //2 Dimensional Array for the incoming Bids
+                {5283, 4827, 4000, 18481},
+                {4681, 4827, 15000, 18482},
+                {5283, 4827, 14500, 18483},
+                {5283, 4827, 17500, 18485},
+                {4681, 4827, 25000, 18489},
+                {5283, 4827, 32000, 18495}
+        };
+
+        ExecutorService executor = Executors.newFixedThreadPool(6); //Creating the Thread Pool
+        for (int[] bid : bids) {   //Loop for the bids
+            int bidderNo = bid[0];  //Assigning the bids (at current position) to variable
+            int itemNo = bid[1];    //Assigning the bids (at current position) to variable
+            double bidAmt = bid[2]; //Assigning the bids (at current position) to variable
+            int time = bid[3];      //Assigning the bids (at current position) to variable
+            executor.submit(new Bid(dutchMastersOilPainting, bidderNo, itemNo, bidAmt, time)); //submitting in the right format
+        }
+        executor.shutdown();
+    }
+}
+
+class ForSale {     //For sale class
+    private String itemName;
+    private double minBid;
+    private double buyItNow;
+    private int itemNo;
+    private int startTime;
+    private int endTime;
+    private boolean itemSold;
+
+    public ForSale(String itemName, double minBid, double buyItNow, int itemNo, int startTime, int endTime) {
+        this.itemName = itemName;
+        this.minBid = minBid;
+        this.buyItNow = buyItNow;
+        this.itemNo = itemNo;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.itemSold = false;
+    }
+    public synchronized void placeBid(int bidderNo, double bidAmt, int time) {
+        if (time < startTime || time > endTime) {           //If the current time is less than start time or current time is greater than end time
+            System.out.println("Bid from bidder " + bidderNo + " is outside the bidding time window.");
+        } else if (bidAmt >= buyItNow && !itemSold) {       //If the bid Amount is greater or equal to the buy it now Price and the item is NOT sold
+            System.out.println("Bidder " + bidderNo + " has bought the item with a 'Buy It Now' price of $" + bidAmt);
+            itemSold = true;    // Then Item is marked as sold
+        } else if (bidAmt >= minBid && !itemSold) {     //If the bid Amount is greater or equal to the minimum bid amout and Item is NOT Sold
+            System.out.println("Bid placed by bidder " + bidderNo + " for amount $" + bidAmt);
+        } else {
+            System.out.println("Bid amount $" + bidAmt + " is below the minimum bid or the item has already been sold.");   //else the bid amount is not enough
+        }
+    }
+}
+class Bid implements Runnable { //Bid Class
+    private ForSale itemForSale;
+    private int bidderNo;
+    private double bidAmt;
+    private int time;
+
+    public Bid(ForSale itemForSale, int bidderNo, int itemNo, double bidAmt, int time) {
+        this.itemForSale = itemForSale;
+        this.bidderNo = bidderNo;
+        this.bidAmt = bidAmt;
+        this.time = time;
+    }
+    @Override
+    public void run() {
+        itemForSale.placeBid(bidderNo, bidAmt, time);
+    }
+}
